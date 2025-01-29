@@ -1,0 +1,82 @@
+name: Compare TSC Error Counts
+description: Compare the TypeScript error counts on the HEAD branch vs. the base branch.
+author: ThinkDX
+runs:
+  using: "composite"
+  steps:
+    - name: Check out HEAD
+      uses: actions/checkout@v3
+      with:
+        # Pull Request context: we want to check out the PR head commit
+        ref: ${{ github.event.pull_request.head.sha }}
+        
+    - name: Install dependencies (HEAD)
+      shell: bash
+      run: npm ci
+
+    - name: Run tsc on HEAD
+      id: tsc_head
+      shell: bash
+      run: |
+        # Run TSC and capture output
+        OUTPUT=$(npx tsc --pretty --noEmit --strict 2>&1 || true)
+
+        # Parse the error count from the lines that match any of these forms:
+        # - "Found 1 error in {0}"
+        # - "Found {0} errors in the same file, starting at: {1}"
+        # - "Found {0} errors in {1} files."
+        # 
+        # We'll look for "Found X error" or "Found X errors" then skip the rest
+        HEAD_ERRORS_COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "")
+
+        # If we didn't find anything, default to 0
+        if [ -z "$HEAD_ERRORS_COUNT" ]; then
+          HEAD_ERRORS_COUNT=0
+        fi
+
+        echo "head_errors=$HEAD_ERRORS_COUNT" >> $GITHUB_OUTPUT
+
+    - name: Check out base
+      uses: actions/checkout@v3
+      with:
+        # Pull Request context: base commit
+        ref: ${{ github.event.pull_request.base.sha }}
+        
+    - name: Install dependencies (BASE)
+      shell: bash
+      run: npm ci
+
+    - name: Run tsc on BASE
+      id: tsc_base
+      shell: bash
+      run: |
+        # Run TSC and capture output
+        OUTPUT=$(npx tsc --pretty --noEmit --strict 2>&1 || true)
+
+        # Parse the error count
+        BASE_ERRORS_COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "")
+
+        # If we didn't find anything, default to 0
+        if [ -z "$BASE_ERRORS_COUNT" ]; then
+          BASE_ERRORS_COUNT=0
+        fi
+        
+        echo "base_errors=$BASE_ERRORS_COUNT" >> $GITHUB_OUTPUT
+
+    - name: Compare error counts
+      shell: bash
+      run: |
+        # Fetch the outputs from previous steps
+        HEAD_ERRORS="${{ steps.tsc_head.outputs.head_errors }}"
+        BASE_ERRORS="${{ steps.tsc_base.outputs.base_errors }}"
+
+        echo "HEAD Errors: $HEAD_ERRORS"
+        echo "Base Errors: $BASE_ERRORS"
+
+        # Fail if HEAD error count is greater than BASE error count
+        if [ "$HEAD_ERRORS" -gt "$BASE_ERRORS" ]; then
+          echo "❌ TSC error count ($HEAD_ERRORS) is greater than base branch ($BASE_ERRORS). Failing..."
+          exit 1
+        else
+          echo "✅ TSC error count ($HEAD_ERRORS) is not greater than base branch ($BASE_ERRORS). Passing..."
+        fi
