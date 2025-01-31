@@ -58,9 +58,11 @@ runs:
         else
           echo "Packages provided. Running TSC in each subdirectory..."
           while read -r PKG; do
+            [ -z "$PKG" ] && continue
             echo "Running TSC in $PKG ..."
             pushd "$PKG" > /dev/null
             ERRORS=$(run_tsc_and_get_errors)
+            echo "$PKG head errors: $ERRORS"
             TOTAL_HEAD_ERRORS=$(( TOTAL_HEAD_ERRORS + ERRORS ))
             popd > /dev/null
           done <<< "$PACKAGES"
@@ -112,8 +114,10 @@ runs:
         if [ -z "$PACKAGES" ]; then
           echo "No packages specified. Running TSC in root..."
           ERRORS=$(run_tsc_and_get_errors)
+          echo "$PKG base errors: $ERRORS"
           TOTAL_BASE_ERRORS=$(( TOTAL_BASE_ERRORS + ERRORS ))
         else
+          [ -z "$PKG" ] && continue
           echo "Packages provided. Running TSC in each subdirectory..."
           while read -r PKG; do
             echo "Running TSC in $PKG ..."
