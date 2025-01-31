@@ -1,6 +1,13 @@
 name: Compare TSC Error Counts
 description: Compare the TypeScript error counts on the HEAD branch vs. the base branch.
 author: ThinkDX
+inputs:
+  packages:
+    description: |
+      A multi-line string listing subdirectories to run TSC in.
+      If left blank, TSC is run only once from the repository root.
+    required: false
+    default: ""
 runs:
   using: "composite"
   steps:
@@ -14,27 +21,53 @@ runs:
       shell: bash
       run: npm ci
 
-    - name: Run tsc on HEAD
-      id: tsc_head
+    - name: Collect typescript errors on HEAD
+      id: head_errors
       shell: bash
       run: |
-        # Run TSC and capture output
-        OUTPUT=$(npx tsc --pretty --noEmit --strict 2>&1 || true)
+        PACKAGES="${{ inputs.packages }}"
+        TOTAL_HEAD_ERRORS=0
 
-        # Parse the error count from the lines that match any of these forms:
-        # - "Found 1 error in {0}"
-        # - "Found {0} errors in the same file, starting at: {1}"
-        # - "Found {0} errors in {1} files."
-        # 
-        # We'll look for "Found X error" or "Found X errors" then skip the rest
-        HEAD_ERRORS_COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "")
+        run_tsc_and_get_errors() {
+          local OUTPUT
+          local COUNT
 
-        # If we didn't find anything, default to 0
-        if [ -z "$HEAD_ERRORS_COUNT" ]; then
-          HEAD_ERRORS_COUNT=0
+          # Run TSC and capture output
+          OUTPUT=$(npx tsc --pretty --noEmit --strict 2>&1 || true)
+
+          # Parse the error count from the lines that match any of these forms:
+          # - "Found 1 error in {0}"
+          # - "Found {0} errors in the same file, starting at: {1}"
+          # - "Found {0} errors in {1} files."
+          # 
+          # We'll look for "Found X error" or "Found X errors" then skip the rest
+          COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "")
+
+          # If we didn't find anything, default to 0
+          if [ -z "$COUNT" ]; then
+            COUNT=0
+          fi
+
+          echo "$COUNT"
+        }
+
+        if [ -z "$PACKAGES" ]; then
+          echo "No packages specified. Running TSC in root..."
+          ERRORS=$(run_tsc_and_get_errors)
+          TOTAL_HEAD_ERRORS=$(( TOTAL_HEAD_ERRORS + ERRORS ))
+        else
+          echo "Packages provided. Running TSC in each subdirectory..."
+          while read -r PKG; do
+            echo "Running TSC in $PKG ..."
+            pushd "$PKG" > /dev/null
+            ERRORS=$(run_tsc_and_get_errors)
+            TOTAL_HEAD_ERRORS=$(( TOTAL_HEAD_ERRORS + ERRORS ))
+            popd > /dev/null
+          done <<< "$PACKAGES"
         fi
 
-        echo "head_errors=$HEAD_ERRORS_COUNT" >> $GITHUB_OUTPUT
+        echo "Total HEAD errors: $TOTAL_HEAD_ERRORS"
+        echo "head_errors=$TOTAL_HEAD_ERRORS" >> $GITHUB_OUTPUT
 
     - name: Check out base
       uses: actions/checkout@v3
@@ -47,28 +80,59 @@ runs:
       run: npm ci
 
     - name: Run tsc on BASE
-      id: tsc_base
+      id: base_errors
       shell: bash
       run: |
-        # Run TSC and capture output
-        OUTPUT=$(npx tsc --pretty --noEmit --strict 2>&1 || true)
+        PACKAGES="${{ inputs.packages }}"
+        TOTAL_BASE_ERRORS=0
 
-        # Parse the error count
-        BASE_ERRORS_COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "")
+        run_tsc_and_get_errors() {
+          local OUTPUT
+          local COUNT
 
-        # If we didn't find anything, default to 0
-        if [ -z "$BASE_ERRORS_COUNT" ]; then
-          BASE_ERRORS_COUNT=0
+          # Run TSC and capture output
+          OUTPUT=$(npx tsc --pretty --noEmit --strict 2>&1 || true)
+
+          # Parse the error count from the lines that match any of these forms:
+          # - "Found 1 error in {0}"
+          # - "Found {0} errors in the same file, starting at: {1}"
+          # - "Found {0} errors in {1} files."
+          # 
+          # We'll look for "Found X error" or "Found X errors" then skip the rest
+          COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "")
+
+          # If we didn't find anything, default to 0
+          if [ -z "$COUNT" ]; then
+            COUNT=0
+          fi
+
+          echo "$COUNT"
+        }
+
+        if [ -z "$PACKAGES" ]; then
+          echo "No packages specified. Running TSC in root..."
+          ERRORS=$(run_tsc_and_get_errors)
+          TOTAL_BASE_ERRORS=$(( TOTAL_BASE_ERRORS + ERRORS ))
+        else
+          echo "Packages provided. Running TSC in each subdirectory..."
+          while read -r PKG; do
+            echo "Running TSC in $PKG ..."
+            pushd "$PKG" > /dev/null
+            ERRORS=$(run_tsc_and_get_errors)
+            TOTAL_BASE_ERRORS=$(( TOTAL_BASE_ERRORS + ERRORS ))
+            popd > /dev/null
+          done <<< "$PACKAGES"
         fi
-        
-        echo "base_errors=$BASE_ERRORS_COUNT" >> $GITHUB_OUTPUT
+
+        echo "Total BASE errors: $TOTAL_BASE_ERRORS"
+        echo "base_errors=$TOTAL_BASE_ERRORS" >> $GITHUB_OUTPUT
 
     - name: Compare error counts
       shell: bash
       run: |
         # Fetch the outputs from previous steps
-        HEAD_ERRORS="${{ steps.tsc_head.outputs.head_errors }}"
-        BASE_ERRORS="${{ steps.tsc_base.outputs.base_errors }}"
+        HEAD_ERRORS="${{ steps.head_errors.outputs.head_errors }}"
+        BASE_ERRORS="${{ steps.base_errors.outputs.base_errors }}"
 
         echo "HEAD Errors: $HEAD_ERRORS"
         echo "Base Errors: $BASE_ERRORS"
