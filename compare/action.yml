@@ -1,0 +1,64 @@
+name: Compare Error Counts
+description: Compare TypeScript error counts between two values
+author: ThinkDX
+
+inputs:
+  head-errors:
+    description: Number of errors in the HEAD branch
+    required: true
+  base-errors:
+    description: Number of errors in the BASE branch
+    required: true
+  fail-on-increase:
+    description: Whether to fail if HEAD has more errors than BASE
+    required: false
+    default: 'true'
+  fail-threshold:
+    description: Maximum allowed increase in errors before failing (only used if fail-on-increase is true)
+    required: false
+    default: '0'
+
+outputs:
+  increased:
+    description: Whether the error count increased
+    value: ${{ steps.compare.outputs.increased }}
+  difference:
+    description: The difference in error count (HEAD - BASE)
+    value: ${{ steps.compare.outputs.difference }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Compare error counts
+      id: compare
+      shell: bash
+      run: |
+        HEAD_ERRORS="${{ inputs.head-errors }}"
+        BASE_ERRORS="${{ inputs.base-errors }}"
+        FAIL_ON_INCREASE="${{ inputs.fail-on-increase }}"
+        FAIL_THRESHOLD="${{ inputs.fail-threshold }}"
+        
+        # Calculate difference
+        DIFFERENCE=$((HEAD_ERRORS - BASE_ERRORS))
+        echo "difference=$DIFFERENCE" >> $GITHUB_OUTPUT
+        
+        # Check if errors increased
+        if [ "$DIFFERENCE" -gt 0 ]; then
+          echo "increased=true" >> $GITHUB_OUTPUT
+          echo "⚠️ TypeScript errors increased by $DIFFERENCE"
+          echo "HEAD Errors: $HEAD_ERRORS"
+          echo "Base Errors: $BASE_ERRORS"
+          
+          if [ "$FAIL_ON_INCREASE" = "true" ] && [ "$DIFFERENCE" -gt "$FAIL_THRESHOLD" ]; then
+            echo "❌ Error count increase ($DIFFERENCE) exceeds threshold ($FAIL_THRESHOLD). Failing..."
+            exit 1
+          fi
+        else
+          echo "increased=false" >> $GITHUB_OUTPUT
+          echo "✅ TypeScript errors did not increase"
+          echo "HEAD Errors: $HEAD_ERRORS"
+          echo "Base Errors: $BASE_ERRORS"
+          if [ "$DIFFERENCE" -lt 0 ]; then
+            echo "🎉 Reduced TypeScript errors by $((-DIFFERENCE))!"
+          fi
+        fi 

@@ -1,0 +1,77 @@
+name: Run TypeScript with Error Count
+description: Run TypeScript compiler in strict mode and count the number of errors
+author: ThinkDX
+
+inputs:
+  working-directory:
+    description: Directory to run TypeScript in
+    required: false
+    default: '.'
+  tsconfig:
+    description: Path to custom tsconfig.json file (relative to working-directory)
+    required: false
+    default: 'tsconfig.json'
+  strict-override:
+    description: Whether to override the strict setting to true regardless of tsconfig
+    required: false
+    default: 'true'
+  prebuild-command:
+    description: Optional command to run before TypeScript compilation
+    required: false
+  prebuild-working-directory:
+    description: Working directory for prebuild command
+    required: false
+    default: '.'
+
+outputs:
+  error-count:
+    description: The number of TypeScript errors found
+    value: ${{ steps.count-errors.outputs.error_count }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run prebuild command
+      if: inputs.prebuild-command != ''
+      shell: bash
+      working-directory: ${{ inputs.prebuild-working-directory }}
+      run: ${{ inputs.prebuild-command }}
+
+    - name: Run TypeScript and count errors
+      id: count-errors
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Function to run TSC and get error count
+        run_tsc_and_get_errors() {
+          local OUTPUT
+          local COUNT
+          local CONFIG_PATH="${{ inputs.tsconfig }}"
+          local STRICT_OVERRIDE="${{ inputs.strict-override }}"
+          
+          # Prepare TSC command
+          local TSC_CMD="npx tsc --pretty --noEmit"
+          
+          # Add strict override if enabled
+          if [ "$STRICT_OVERRIDE" = "true" ]; then
+            TSC_CMD="$TSC_CMD --strict"
+          fi
+          
+          # Add config path if specified
+          if [ -f "$CONFIG_PATH" ]; then
+            TSC_CMD="$TSC_CMD --project $CONFIG_PATH"
+          fi
+
+          # Run TSC and capture output
+          OUTPUT=$($TSC_CMD 2>&1 || true)
+          
+          # Parse error count using improved regex
+          COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "0")
+          
+          echo "$COUNT"
+        }
+
+        # Run TSC and get error count
+        ERROR_COUNT=$(run_tsc_and_get_errors)
+        echo "TypeScript errors found: $ERROR_COUNT"
+        echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT 

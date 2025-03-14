@@ -1,150 +1,116 @@
 name: Compare TSC Error Counts
 description: Compare the TypeScript error counts on the HEAD branch vs. the base branch.
 author: ThinkDX
+
 inputs:
-  packages:
-    description: |
-      A multi-line string listing subdirectories to run TSC in.
-      If left blank, TSC is run only once from the repository root.
+  working-directory:
+    description: Directory to run TypeScript in
     required: false
-    default: ""
+    default: '.'
+  package-manager:
+    description: Package manager to use (npm, yarn, or pnpm)
+    required: false
+    default: 'npm'
+  enable-cache:
+    description: Whether to enable dependency caching
+    required: false
+    default: 'true'
+  install-command:
+    description: Custom install command (overrides default package manager command)
+    required: false
+  node-version:
+    description: Node.js version to use
+    required: false
+    default: '18'
+  tsconfig:
+    description: Path to custom tsconfig.json file (relative to working-directory)
+    required: false
+    default: 'tsconfig.json'
+  strict-override:
+    description: Whether to override the strict setting to true regardless of tsconfig
+    required: false
+    default: 'true'
+  prebuild-command:
+    description: Optional command to run before TypeScript compilation
+    required: false
+  prebuild-working-directory:
+    description: Working directory for prebuild command
+    required: false
+    default: '.'
+  fail-threshold:
+    description: Maximum allowed increase in errors before failing
+    required: false
+    default: '0'
+
+outputs:
+  head-errors:
+    description: Number of TypeScript errors in HEAD
+    value: ${{ steps.head-check.outputs.error-count }}
+  base-errors:
+    description: Number of TypeScript errors in BASE
+    value: ${{ steps.base-check.outputs.error-count }}
+  error-difference:
+    description: Difference in error count (HEAD - BASE)
+    value: ${{ steps.compare.outputs.difference }}
+  errors-increased:
+    description: Whether the error count increased
+    value: ${{ steps.compare.outputs.increased }}
+
 runs:
   using: "composite"
   steps:
     - name: Check out HEAD
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
-        # Pull Request context: we want to check out the PR head commit
         ref: ${{ github.event.pull_request.head.sha }}
         
     - name: Install dependencies (HEAD)
-      shell: bash
-      run: npm ci
+      uses: ./install
+      with:
+        package-manager: ${{ inputs.package-manager }}
+        working-directory: ${{ inputs.working-directory }}
+        enable-cache: ${{ inputs.enable-cache }}
+        install-command: ${{ inputs.install-command }}
+        node-version: ${{ inputs.node-version }}
 
-    - name: Collect typescript errors on HEAD
-      id: head_errors
-      shell: bash
-      run: |
-        PACKAGES="${{ inputs.packages }}"
-        TOTAL_HEAD_ERRORS=0
+    - name: Run TypeScript check (HEAD)
+      id: head-check
+      uses: ./typescript
+      with:
+        working-directory: ${{ inputs.working-directory }}
+        tsconfig: ${{ inputs.tsconfig }}
+        strict-override: ${{ inputs.strict-override }}
+        prebuild-command: ${{ inputs.prebuild-command }}
+        prebuild-working-directory: ${{ inputs.prebuild-working-directory }}
 
-        run_tsc_and_get_errors() {
-          local OUTPUT
-          local COUNT
-
-          # Run TSC and capture output
-          OUTPUT=$(npx tsc --pretty --noEmit --strict 2>&1 || true)
-
-          # Parse the error count from the lines that match any of these forms:
-          # - "Found 1 error in {0}"
-          # - "Found {0} errors in the same file, starting at: {1}"
-          # - "Found {0} errors in {1} files."
-          # 
-          # We'll look for "Found X error" or "Found X errors" then skip the rest
-          COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "")
-
-          # If we didn't find anything, default to 0
-          if [ -z "$COUNT" ]; then
-            COUNT=0
-          fi
-
-          echo "$COUNT"
-        }
-
-        if [ -z "$PACKAGES" ]; then
-          echo "No packages specified. Running TSC in root..."
-          ERRORS=$(run_tsc_and_get_errors)
-          TOTAL_HEAD_ERRORS=$(( TOTAL_HEAD_ERRORS + ERRORS ))
-        else
-          echo "Packages provided. Running TSC in each subdirectory..."
-          while read -r PKG; do
-            [ -z "$PKG" ] && continue
-            echo "Running TSC in $PKG ..."
-            pushd "$PKG" > /dev/null
-            ERRORS=$(run_tsc_and_get_errors)
-            echo "$PKG head errors: $ERRORS"
-            TOTAL_HEAD_ERRORS=$(( TOTAL_HEAD_ERRORS + ERRORS ))
-            popd > /dev/null
-          done <<< "$PACKAGES"
-        fi
-
-        echo "Total HEAD errors: $TOTAL_HEAD_ERRORS"
-        echo "head_errors=$TOTAL_HEAD_ERRORS" >> $GITHUB_OUTPUT
-
-    - name: Check out base
+    - name: Check out BASE
       uses: actions/checkout@v3
       with:
-        # Pull Request context: base commit
         ref: ${{ github.event.pull_request.base.sha }}
         
     - name: Install dependencies (BASE)
-      shell: bash
-      run: npm ci
+      uses: ./install
+      with:
+        package-manager: ${{ inputs.package-manager }}
+        working-directory: ${{ inputs.working-directory }}
+        enable-cache: ${{ inputs.enable-cache }}
+        install-command: ${{ inputs.install-command }}
+        node-version: ${{ inputs.node-version }}
 
-    - name: Run tsc on BASE
-      id: base_errors
-      shell: bash
-      run: |
-        PACKAGES="${{ inputs.packages }}"
-        TOTAL_BASE_ERRORS=0
-
-        run_tsc_and_get_errors() {
-          local OUTPUT
-          local COUNT
-
-          # Run TSC and capture output
-          OUTPUT=$(npx tsc --pretty --noEmit --strict 2>&1 || true)
-
-          # Parse the error count from the lines that match any of these forms:
-          # - "Found 1 error in {0}"
-          # - "Found {0} errors in the same file, starting at: {1}"
-          # - "Found {0} errors in {1} files."
-          # 
-          # We'll look for "Found X error" or "Found X errors" then skip the rest
-          COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "")
-
-          # If we didn't find anything, default to 0
-          if [ -z "$COUNT" ]; then
-            COUNT=0
-          fi
-
-          echo "$COUNT"
-        }
-
-        if [ -z "$PACKAGES" ]; then
-          echo "No packages specified. Running TSC in root..."
-          ERRORS=$(run_tsc_and_get_errors)
-          echo "$PKG base errors: $ERRORS"
-          TOTAL_BASE_ERRORS=$(( TOTAL_BASE_ERRORS + ERRORS ))
-        else
-          [ -z "$PKG" ] && continue
-          echo "Packages provided. Running TSC in each subdirectory..."
-          while read -r PKG; do
-            echo "Running TSC in $PKG ..."
-            pushd "$PKG" > /dev/null
-            ERRORS=$(run_tsc_and_get_errors)
-            TOTAL_BASE_ERRORS=$(( TOTAL_BASE_ERRORS + ERRORS ))
-            popd > /dev/null
-          done <<< "$PACKAGES"
-        fi
-
-        echo "Total BASE errors: $TOTAL_BASE_ERRORS"
-        echo "base_errors=$TOTAL_BASE_ERRORS" >> $GITHUB_OUTPUT
+    - name: Run TypeScript check (BASE)
+      id: base-check
+      uses: ./typescript
+      with:
+        working-directory: ${{ inputs.working-directory }}
+        tsconfig: ${{ inputs.tsconfig }}
+        strict-override: ${{ inputs.strict-override }}
+        prebuild-command: ${{ inputs.prebuild-command }}
+        prebuild-working-directory: ${{ inputs.prebuild-working-directory }}
 
     - name: Compare error counts
-      shell: bash
-      run: |
-        # Fetch the outputs from previous steps
-        HEAD_ERRORS="${{ steps.head_errors.outputs.head_errors }}"
-        BASE_ERRORS="${{ steps.base_errors.outputs.base_errors }}"
-
-        echo "HEAD Errors: $HEAD_ERRORS"
-        echo "Base Errors: $BASE_ERRORS"
-
-        # Fail if HEAD error count is greater than BASE error count
-        if [ "$HEAD_ERRORS" -gt "$BASE_ERRORS" ]; then
-          echo "❌ TSC error count ($HEAD_ERRORS) is greater than base branch ($BASE_ERRORS). Failing..."
-          exit 1
-        else
-          echo "✅ TSC error count ($HEAD_ERRORS) is not greater than base branch ($BASE_ERRORS). Passing..."
-        fi
+      id: compare
+      uses: ./compare
+      with:
+        head-errors: ${{ steps.head-check.outputs.error-count }}
+        base-errors: ${{ steps.base-check.outputs.error-count }}
+        fail-threshold: ${{ inputs.fail-threshold }}

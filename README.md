@@ -1,23 +1,21 @@
 # TS Stricter
 
-This GitHub Action helps you **iteratively migrate** your **unstrict** TypeScript codebase to a **strict** one. It does this by **comparing the TypeScript error count** on your pull request’s **HEAD** branch vs. the **BASE** branch and **fails** the workflow if new errors have been introduced.  
+This GitHub Action helps you **iteratively migrate** your **unstrict** TypeScript codebase to a **strict** one. It does this by **comparing the TypeScript error count** on your pull request's **HEAD** branch vs. the **BASE** branch and **fails** the workflow if new errors have been introduced.  
 
 By ensuring that your error count never goes up, your team can gradually reduce existing errors over time—eventually reaching a fully strict codebase without sudden disruptions.
 
----
+## Features
 
-## How It Works
-
-1. **Checkout** and run `tsc` on the **HEAD** branch (the PR branch).
-2. **Extract** the number of errors from the compiler output.
-3. **Checkout** the **BASE** branch and run `tsc` again.
-4. **Compare** the two error counts and **fail** the workflow if the HEAD error count is greater.
-
-This approach enforces a “**no new errors**” policy, allowing teams to **chip away** at TypeScript errors and strictness violations without overwhelming developers.
-
----
+- 🔄 **Flexible Installation**: Support for npm, yarn, and pnpm with customizable install commands
+- 💾 **Dependency Caching**: Optional caching to speed up your workflows
+- 🛠 **Prebuild Support**: Run custom commands before TypeScript compilation
+- ⚙️ **TypeScript Configuration**: Use your own tsconfig.json with strict mode enforcement
+- 📊 **Error Tracking**: Detailed error count comparison with configurable failure thresholds
+- 🧩 **Modular Design**: Use the full workflow or individual composite actions for custom needs
 
 ## Usage
+
+### Basic Usage
 
 In your repository, create or update a GitHub Actions workflow file (e.g. `.github/workflows/compare-tsc-errors.yml`) with the following:
 
@@ -33,32 +31,108 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Compare TSC on HEAD vs BASE
-        uses: thinkdx/ts-stricter@v1
+        uses: thinkdx/ts-stricter@v2
 ```
 
-### Notes
+### Advanced Usage
+
+```yaml
+name: Compare TSC Errors
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  compare-tsc-errors:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare TSC on HEAD vs BASE
+        uses: thinkdx/ts-stricter@v2
+        with:
+          # Installation options
+          package-manager: 'yarn'           # npm, yarn, or pnpm (default: npm)
+          enable-cache: true                # Enable dependency caching (default: true)
+          install-command: 'yarn install'   # Custom install command (optional)
+          node-version: '18'               # Node.js version (default: 18)
+          
+          # TypeScript options
+          working-directory: './packages/core'  # Directory to run in (default: .)
+          tsconfig: 'tsconfig.strict.json'     # Custom tsconfig path (default: tsconfig.json)
+          strict-override: true                # Force strict mode (default: true)
+          
+          # Build options
+          prebuild-command: 'yarn build:deps'  # Command to run before TSC (optional)
+          prebuild-working-directory: '.'      # Prebuild working directory (default: .)
+          
+          # Error handling
+          fail-threshold: 5                    # Allow up to 5 new errors (default: 0)
+```
+
+## Composite Actions
+
+This package includes several composite actions that can be used independently:
+
+### TypeScript Check (`./typescript`)
+
+Run TypeScript compiler and count errors:
+
+```yaml
+- uses: thinkdx/ts-stricter/typescript@v2
+  with:
+    working-directory: '.'
+    tsconfig: 'tsconfig.json'
+    strict-override: true
+    prebuild-command: ''
+    prebuild-working-directory: '.'
+```
+
+### Dependency Installation (`./install`)
+
+Install Node.js dependencies with caching:
+
+```yaml
+- uses: thinkdx/ts-stricter/install@v2
+  with:
+    package-manager: 'npm'
+    working-directory: '.'
+    enable-cache: true
+    install-command: ''
+    node-version: '18'
+```
+
+### Error Comparison (`./compare`)
+
+Compare TypeScript error counts:
+
+```yaml
+- uses: thinkdx/ts-stricter/compare@v2
+  with:
+    head-errors: '10'
+    base-errors: '12'
+    fail-threshold: '0'
+```
+
+## Outputs
+
+The main action provides the following outputs:
+
+- `head-errors`: Number of TypeScript errors in HEAD
+- `base-errors`: Number of TypeScript errors in BASE
+- `error-difference`: Difference in error count (HEAD - BASE)
+- `errors-increased`: Whether the error count increased
+
+## Notes
 
 1. **Pull Request Context**: This Action is specifically designed for **pull_request** events because it compares HEAD vs. BASE.
-2. **Node Setup**: If you need a different Node version or have a custom install step, place those steps **before** calling the Action.
-3. **Permissions**: Ensure the workflow has sufficient permissions for checking out and reading the repository.
-4. **tsconfig**: Make sure your repository has a `tsconfig.json` that `tsc` can recognize.  
-5. **No Additional Errors**: If the PR introduces new TypeScript errors, the Action will fail, helping maintain or reduce your overall error count.
-
----
-
-## Why Use This Action?
-
-- **Iterative Strictness**: Incrementally refactor your codebase to stricter TypeScript settings without a large one-time lift.
-- **Prevent Regression**: Ensure new pull requests don’t introduce additional errors, keeping your journey to strictness on track.
-- **Simple Integration**: Add a single workflow step that automatically checks and enforces your error budget.
-
----
+2. **TypeScript Configuration**: The action will use your repository's `tsconfig.json` by default, with the `--strict` flag enforced unless disabled.
+3. **Caching**: Dependency caching is enabled by default to speed up workflows. Disable it with `enable-cache: false` if needed.
+4. **Custom Commands**: Use `install-command` and `prebuild-command` to customize the workflow for complex setups.
+5. **Error Threshold**: Set `fail-threshold` to allow a certain number of new errors before failing the workflow.
 
 ## Contributing
 
 Contributions and feedback are welcome! If you have new ideas or run into issues, please open a GitHub issue or submit a pull request to this repository.
-
----
 
 ## License
 

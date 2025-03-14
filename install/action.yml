@@ -1,0 +1,79 @@
+name: Install Dependencies
+description: Install Node.js dependencies with optional caching
+author: ThinkDX
+
+inputs:
+  package-manager:
+    description: Package manager to use (npm, yarn, or pnpm)
+    required: false
+    default: 'npm'
+  working-directory:
+    description: Directory containing package.json
+    required: false
+    default: '.'
+  enable-cache:
+    description: Whether to enable dependency caching
+    required: false
+    default: 'true'
+  cache-key:
+    description: Custom cache key for dependencies
+    required: false
+    default: ''
+  install-command:
+    description: Custom install command (overrides default package manager command)
+    required: false
+  node-version:
+    description: Node.js version to use
+    required: false
+    default: '18'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ inputs.node-version }}
+        
+    - name: Get package manager data
+      id: package-manager
+      shell: bash
+      run: |
+        case "${{ inputs.package-manager }}" in
+          "npm")
+            echo "lock_file=package-lock.json" >> $GITHUB_OUTPUT
+            echo "cache_path=~/.npm" >> $GITHUB_OUTPUT
+            echo "install_cmd=npm ci" >> $GITHUB_OUTPUT
+            ;;
+          "yarn")
+            echo "lock_file=yarn.lock" >> $GITHUB_OUTPUT
+            echo "cache_path=.yarn/cache" >> $GITHUB_OUTPUT
+            echo "install_cmd=yarn install --frozen-lockfile" >> $GITHUB_OUTPUT
+            ;;
+          "pnpm")
+            echo "lock_file=pnpm-lock.yaml" >> $GITHUB_OUTPUT
+            echo "cache_path=~/.pnpm-store" >> $GITHUB_OUTPUT
+            echo "install_cmd=pnpm install --frozen-lockfile" >> $GITHUB_OUTPUT
+            ;;
+        esac
+
+    - name: Cache dependencies
+      if: inputs.enable-cache == 'true'
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.package-manager.outputs.cache_path }}
+        key: ${{ runner.os }}-${{ inputs.package-manager }}-${{ inputs.cache-key || hashFiles(format('{0}/{1}', inputs.working-directory, steps.package-manager.outputs.lock_file)) }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.package-manager }}-
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -n "${{ inputs.install-command }}" ]; then
+          ${{ inputs.install-command }}
+        else
+          if [ "${{ inputs.package-manager }}" = "pnpm" ]; then
+            npm install -g pnpm
+          fi
+          ${{ steps.package-manager.outputs.install_cmd }} 
