@@ -41,6 +41,10 @@ inputs:
     description: Maximum allowed increase in errors before failing
     required: false
     default: '0'
+  use-head-commit:
+    description: Whether to use the head commit SHA instead of the merge SHA
+    required: false
+    default: 'false'
 
 outputs:
   head-errors:
@@ -88,18 +92,19 @@ runs:
         prebuild-command: ${{ inputs.prebuild-command }}
         prebuild-working-directory: ${{ inputs.prebuild-working-directory }}
 
-    - name: Check out HEAD
-      if: ${{ inputs. }}
+    - name: Check out HEAD (merged)
+      if: ${{ inputs.use-head-commit == 'false' }}
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+    - name: Check out HEAD (direct)
+      if: ${{ inputs.use-head-commit == 'true' }}
       uses: actions/checkout@v4
       with:
         ref: ${{ github.event.pull_request.head.sha }}
-
-    - name: Check out HEAD (merged)
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_reqesut.merge_commit_sha }}
         
-    - name: Install dependencies (BASE)
+    - name: Install dependencies (HEAD)
       uses: ./install
       with:
         package-manager: ${{ inputs.package-manager }}
@@ -108,8 +113,8 @@ runs:
         install-command: ${{ inputs.install-command }}
         node-version: ${{ inputs.node-version }}
 
-    - name: Run TypeScript check (BASE)
-      id: base-check
+    - name: Run TypeScript check (HEAD)
+      id: head-check
       uses: ./typescript
       with:
         working-directory: ${{ inputs.working-directory }}
