@@ -59,12 +59,12 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Check out HEAD
+    - name: Check out BASE
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.head.sha }}
+        ref: ${{ github.event.pull_request.base.sha }}
         
-    - name: Install dependencies (HEAD)
+    - name: Install dependencies (BASE)
       uses: ./install
       with:
         package-manager: ${{ inputs.package-manager }}
@@ -73,8 +73,13 @@ runs:
         install-command: ${{ inputs.install-command }}
         node-version: ${{ inputs.node-version }}
 
-    - name: Run TypeScript check (HEAD)
-      id: head-check
+    - name: Perform post install (BASE)
+      if: "false"
+      run: ""
+      shell: "bash"
+
+    - name: Run TypeScript check (BASE)
+      id: base-check
       uses: ./typescript
       with:
         working-directory: ${{ inputs.working-directory }}
@@ -83,10 +88,16 @@ runs:
         prebuild-command: ${{ inputs.prebuild-command }}
         prebuild-working-directory: ${{ inputs.prebuild-working-directory }}
 
-    - name: Check out BASE
-      uses: actions/checkout@v3
+    - name: Check out HEAD
+      if: ${{ inputs. }}
+      uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.base.sha }}
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: Check out HEAD (merged)
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_reqesut.merge_commit_sha }}
         
     - name: Install dependencies (BASE)
       uses: ./install
