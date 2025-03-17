@@ -57,7 +57,9 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       run: |
         if [ -n "${{ inputs.install-command }}" ]; then
+          echo "Running custom install command"
           ${{ inputs.install-command }}
         else
+          echo "Running default package manager command"
           ${{ steps.package-manager.outputs.install_cmd }}
         fi
