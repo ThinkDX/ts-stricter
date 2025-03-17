@@ -32,7 +32,6 @@ runs:
         HEAD_ERRORS="${{ inputs.head-errors }}"
         BASE_ERRORS="${{ inputs.base-errors }}"
         FAIL_ON_INCREASE="${{ inputs.fail-on-increase }}"
-        FAIL_THRESHOLD="0"
         
         # Calculate difference
         DIFFERENCE=$((HEAD_ERRORS - BASE_ERRORS))
@@ -45,8 +44,8 @@ runs:
           echo "HEAD Errors: $HEAD_ERRORS"
           echo "BASE Errors: $BASE_ERRORS"
           
-          if [ "$FAIL_ON_INCREASE" = "true" ] && [ "$DIFFERENCE" -gt "$FAIL_THRESHOLD" ]; then
-            echo "Error count increase ($DIFFERENCE) exceeds threshold ($FAIL_THRESHOLD). Failing..."
+          if [ "$FAIL_ON_INCREASE" = "true" ]; then
+            echo "Error count increase ($DIFFERENCE). Failing..."
             exit 1
           fi
         else
