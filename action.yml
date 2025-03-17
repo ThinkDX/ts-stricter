@@ -77,11 +77,6 @@ runs:
         install-command: ${{ inputs.install-command }}
         node-version: ${{ inputs.node-version }}
 
-    - name: Perform post install (BASE)
-      if: "false"
-      run: ""
-      shell: "bash"
-
     - name: Run TypeScript check (BASE)
       id: base-check
       uses: ./typescript
