@@ -49,7 +49,7 @@ runs:
         esac
 
     - name: Install pnpm
-      if: inputs.package-manager == 'pnpm'
+      if: ${{ inputs.package-manager == 'pnpm' }}
       uses: pnpm/action-setup@v4
 
     - name: Install dependencies
