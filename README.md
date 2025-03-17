@@ -64,9 +64,6 @@ jobs:
           # Build options
           prebuild-command: 'yarn build:deps'  # Command to run before TSC (optional)
           prebuild-working-directory: '.'      # Prebuild working directory (default: .)
-          
-          # Error handling
-          fail-threshold: 5                    # Allow up to 5 new errors (default: 0)
 ```
 
 ## Composite Actions
@@ -110,7 +107,6 @@ Compare TypeScript error counts:
   with:
     head-errors: '10'
     base-errors: '12'
-    fail-threshold: '0'
 ```
 
 ## Outputs
@@ -128,7 +124,6 @@ The main action provides the following outputs:
 2. **TypeScript Configuration**: The action will use your repository's `tsconfig.json` by default, with the `--strict` flag enforced unless disabled.
 3. **Caching**: Dependency caching is enabled by default to speed up workflows. Disable it with `cache-dependencies: false` if needed.
 4. **Custom Commands**: Use `install-command` and `prebuild-command` to customize the workflow for complex setups.
-5. **Error Threshold**: Set `fail-threshold` to allow a certain number of new errors before failing the workflow.
 
 ## Contributing
 

@@ -37,10 +37,6 @@ inputs:
     description: Working directory for prebuild command
     required: false
     default: '.'
-  fail-threshold:
-    description: Maximum allowed increase in errors before failing
-    required: false
-    default: '0'
   use-head-commit:
     description: Whether to use the head commit SHA instead of the merge SHA
     required: false
@@ -124,4 +120,3 @@ runs:
       with:
         head-errors: ${{ steps.head-check.outputs.error-count }}
         base-errors: ${{ steps.base-check.outputs.error-count }}
-        fail-threshold: ${{ inputs.fail-threshold }}
