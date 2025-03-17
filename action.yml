@@ -69,7 +69,7 @@ runs:
         ref: ${{ github.event.pull_request.base.sha }}
         
     - name: Install dependencies (BASE)
-      uses: ./install
+      uses: thinkdx/ts-stricter/install@next
       with:
         package-manager: ${{ inputs.package-manager }}
         working-directory: ${{ inputs.working-directory }}
@@ -79,7 +79,7 @@ runs:
 
     - name: Run TypeScript check (BASE)
       id: base-check
-      uses: ./typescript
+      uses: thinkdx/ts-stricter/typescript@next
       with:
         working-directory: ${{ inputs.working-directory }}
         tsconfig: ${{ inputs.tsconfig }}
@@ -100,7 +100,7 @@ runs:
         ref: ${{ github.event.pull_request.head.sha }}
         
     - name: Install dependencies (HEAD)
-      uses: ./install
+      uses: thinkdx/ts-stricter/install@next
       with:
         package-manager: ${{ inputs.package-manager }}
         working-directory: ${{ inputs.working-directory }}
@@ -110,7 +110,7 @@ runs:
 
     - name: Run TypeScript check (HEAD)
       id: head-check
-      uses: ./typescript
+      uses: thinkdx/ts-stricter/typescript@next
       with:
         working-directory: ${{ inputs.working-directory }}
         tsconfig: ${{ inputs.tsconfig }}
@@ -120,7 +120,7 @@ runs:
 
     - name: Compare error counts
       id: compare
-      uses: ./compare
+      uses: thinkdx/ts-stricter/compare@next
       with:
         head-errors: ${{ steps.head-check.outputs.error-count }}
         base-errors: ${{ steps.base-check.outputs.error-count }}
