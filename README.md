@@ -52,7 +52,7 @@ jobs:
         with:
           # Installation options
           package-manager: 'yarn'           # npm, yarn, or pnpm (default: npm)
-          enable-cache: true                # Enable dependency caching (default: true)
+          cache-dependencies: true                # Enable dependency caching (default: true)
           install-command: 'yarn install'   # Custom install command (optional)
           node-version: '18'               # Node.js version (default: 18)
           
@@ -96,7 +96,7 @@ Install Node.js dependencies with caching:
   with:
     package-manager: 'npm'
     working-directory: '.'
-    enable-cache: true
+    cache-dependencies: true
     install-command: ''
     node-version: '18'
 ```
@@ -126,7 +126,7 @@ The main action provides the following outputs:
 
 1. **Pull Request Context**: This Action is specifically designed for **pull_request** events because it compares HEAD vs. BASE.
 2. **TypeScript Configuration**: The action will use your repository's `tsconfig.json` by default, with the `--strict` flag enforced unless disabled.
-3. **Caching**: Dependency caching is enabled by default to speed up workflows. Disable it with `enable-cache: false` if needed.
+3. **Caching**: Dependency caching is enabled by default to speed up workflows. Disable it with `cache-dependencies: false` if needed.
 4. **Custom Commands**: Use `install-command` and `prebuild-command` to customize the workflow for complex setups.
 5. **Error Threshold**: Set `fail-threshold` to allow a certain number of new errors before failing the workflow.
 

@@ -11,7 +11,7 @@ inputs:
     description: Package manager to use (npm, yarn, or pnpm)
     required: false
     default: 'npm'
-  enable-cache:
+  cache-dependencies:
     description: Whether to enable dependency caching
     required: false
     default: 'true'
@@ -73,7 +73,7 @@ runs:
       with:
         package-manager: ${{ inputs.package-manager }}
         working-directory: ${{ inputs.working-directory }}
-        enable-cache: ${{ inputs.enable-cache }}
+        cache-dependencies: ${{ inputs.cache-dependencies }}
         install-command: ${{ inputs.install-command }}
         node-version: ${{ inputs.node-version }}
 
@@ -104,7 +104,7 @@ runs:
       with:
         package-manager: ${{ inputs.package-manager }}
         working-directory: ${{ inputs.working-directory }}
-        enable-cache: ${{ inputs.enable-cache }}
+        cache-dependencies: ${{ inputs.cache-dependencies }}
         install-command: ${{ inputs.install-command }}
         node-version: ${{ inputs.node-version }}
 
