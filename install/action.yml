@@ -21,7 +21,9 @@ inputs:
   node-version:
     description: Node.js version to use
     required: false
-    default: '18'
+  node-version-file:
+    description: Path to custom node version file (relative to working-directory)
+    required: false
 
 runs:
   using: "composite"
@@ -30,6 +32,7 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
+        node-version-file: ${{ inputs.node-version-file }}
         cache: ${{ (inputs.cache-dependencies == 'true' && inputs.package-manager) || '' }}
         
     - name: Get package manager data

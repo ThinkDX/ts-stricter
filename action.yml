@@ -21,7 +21,9 @@ inputs:
   node-version:
     description: Node.js version to use
     required: false
-    default: '18'
+  node-version-file:
+    description: Path to custom node version file (relative to working-directory)
+    required: false
   tsconfig:
     description: Path to custom tsconfig.json file (relative to working-directory)
     required: false
@@ -72,6 +74,7 @@ runs:
         cache-dependencies: ${{ inputs.cache-dependencies }}
         install-command: ${{ inputs.install-command }}
         node-version: ${{ inputs.node-version }}
+        node-version-file: ${{ inputs.node-version-file }}
 
     - name: Run TypeScript check (BASE)
       id: base-check
@@ -103,6 +106,7 @@ runs:
         cache-dependencies: ${{ inputs.cache-dependencies }}
         install-command: ${{ inputs.install-command }}
         node-version: ${{ inputs.node-version }}
+        node-version-file: ${{ inputs.node-version-file }}
 
     - name: Run TypeScript check (HEAD)
       id: head-check
