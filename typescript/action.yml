@@ -22,15 +22,34 @@ inputs:
     description: Working directory for prebuild command
     required: false
     default: '.'
+  is-workspace:
+    description: Whether this is a workspace with multiple packages
+    required: false
+    default: 'false'
+  workspace-packages:
+    description: Comma-separated list of workspace package directories
+    required: false
+  workspace-prebuild-command:
+    description: Optional command to run before TypeScript compilation at workspace root
+    required: false
 
 outputs:
   error-count:
-    description: The number of TypeScript errors found
+    description: The number of TypeScript errors found (for single package)
     value: ${{ steps.count-errors.outputs.error_count }}
+  package-errors:
+    description: JSON object containing error counts per package (for workspaces)
+    value: ${{ steps.count-errors.outputs.package_errors }}
 
 runs:
   using: "composite"
   steps:
+    - name: Run workspace prebuild command
+      if: inputs.is-workspace == 'true' && inputs.workspace-prebuild-command != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: ${{ inputs.workspace-prebuild-command }}
+
     - name: Run prebuild command
       if: inputs.prebuild-command != ''
       shell: bash
@@ -44,6 +63,7 @@ runs:
       run: |
         # Function to run TSC and get error count
         run_tsc_and_get_errors() {
+          local PACKAGE_DIR="$1"
           local OUTPUT
           local COUNT
           local CONFIG_PATH="${{ inputs.tsconfig }}"
@@ -63,7 +83,7 @@ runs:
           fi
 
           # Run TSC and capture output
-          OUTPUT=$($TSC_CMD 2>&1 || true)
+          OUTPUT=$(cd "$PACKAGE_DIR" && $TSC_CMD 2>&1 || true)
           
           # Parse error count using improved regex
           COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "0")
@@ -71,7 +91,32 @@ runs:
           echo "$COUNT"
         }
 
-        # Run TSC and get error count
-        ERROR_COUNT=$(run_tsc_and_get_errors)
-        echo "TypeScript errors found: $ERROR_COUNT"
-        echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT 
+        if [ "${{ inputs.is-workspace }}" = "true" ]; then
+          # Handle workspace case
+          declare -A PACKAGE_ERRORS
+          IFS=',' read -ra PACKAGES <<< "${{ inputs.workspace-packages }}"
+          
+          for PACKAGE in "${PACKAGES[@]}"; do
+            PACKAGE=$(echo "$PACKAGE" | xargs) # Trim whitespace
+            ERROR_COUNT=$(run_tsc_and_get_errors "$PACKAGE")
+            PACKAGE_ERRORS["$PACKAGE"]=$ERROR_COUNT
+            echo "TypeScript errors in $PACKAGE: $ERROR_COUNT"
+          done
+          
+          # Convert associative array to JSON
+          JSON="{"
+          for PACKAGE in "${!PACKAGE_ERRORS[@]}"; do
+            if [ "$JSON" != "{" ]; then
+              JSON="$JSON,"
+            fi
+            JSON="$JSON\"$PACKAGE\":${PACKAGE_ERRORS[$PACKAGE]}"
+          done
+          JSON="$JSON}"
+          
+          echo "package_errors=$JSON" >> $GITHUB_OUTPUT
+        else
+          # Handle single package case
+          ERROR_COUNT=$(run_tsc_and_get_errors ".")
+          echo "TypeScript errors found: $ERROR_COUNT"
+          echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
+        fi 

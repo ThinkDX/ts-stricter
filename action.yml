@@ -33,7 +33,7 @@ inputs:
     required: false
     default: 'true'
   prebuild-command:
-    description: Optional command to run before TypeScript compilation
+    description: Optional command to run before TypeScript compilation (runs per package)
     required: false
   prebuild-working-directory:
     description: Working directory for prebuild command
@@ -43,6 +43,15 @@ inputs:
     description: Whether to use the head commit SHA instead of the merge SHA
     required: false
     default: 'false'
+  is-workspace:
+    description: Whether this is a workspace with multiple packages
+    required: false
+    default: 'false'
+  workspace-packages:
+    description: Comma-separated list of workspace package directories (only used if is-workspace is true)
+    required: false
+  workspace-prebuild-command:
+    description: Optional command to run before TypeScript compilation (runs at workspace root)
 
 outputs:
   head-errors:
@@ -85,6 +94,9 @@ runs:
         strict-override: ${{ inputs.strict-override }}
         prebuild-command: ${{ inputs.prebuild-command }}
         prebuild-working-directory: ${{ inputs.prebuild-working-directory }}
+        is-workspace: ${{ inputs.is-workspace }}
+        workspace-packages: ${{ inputs.workspace-packages }}
+        workspace-prebuild-command: ${{ inputs.workspace-prebuild-command }}
 
     - name: Check out HEAD (merged)
       if: ${{ inputs.use-head-commit == 'false' }}
@@ -117,6 +129,9 @@ runs:
         strict-override: ${{ inputs.strict-override }}
         prebuild-command: ${{ inputs.prebuild-command }}
         prebuild-working-directory: ${{ inputs.prebuild-working-directory }}
+        is-workspace: ${{ inputs.is-workspace }}
+        workspace-packages: ${{ inputs.workspace-packages }}
+        workspace-prebuild-command: ${{ inputs.workspace-prebuild-command }}
 
     - name: Compare error counts
       id: compare
@@ -124,3 +139,6 @@ runs:
       with:
         head-errors: ${{ steps.head-check.outputs.error-count }}
         base-errors: ${{ steps.base-check.outputs.error-count }}
+        head-package-errors: ${{ steps.head-check.outputs.package-errors }}
+        base-package-errors: ${{ steps.base-check.outputs.package-errors }}
+        is-workspace: ${{ inputs.is-workspace }}
