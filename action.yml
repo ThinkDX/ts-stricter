@@ -90,7 +90,7 @@ runs:
       if: ${{ inputs.use-head-commit == 'false' }}
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.merge_commit_sha }}
+        ref: ${{ github.sha }}
 
     - name: Check out HEAD (direct)
       if: ${{ inputs.use-head-commit == 'true' }}
