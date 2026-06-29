@@ -1,0 +1,8 @@
+{
+  "name": "ts-stricter-tests",
+  "private": true,
+  "description": "Local test harness for ts-stricter. Provides a single typescript install shared by all fixtures.",
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

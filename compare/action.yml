@@ -1,5 +1,5 @@
 name: Compare Error Counts
-description: Compare TypeScript error counts between two values
+description: Compare TypeScript error counts between two values and fail when they increase
 author: ThinkDX
 
 inputs:
@@ -20,7 +20,7 @@ inputs:
     required: false
     default: 'false'
   fail-on-increase:
-    description: Whether to fail if HEAD has more errors than BASE
+    description: Whether to fail the action if HEAD has more errors than BASE
     required: false
     default: 'true'
 
@@ -41,96 +41,11 @@ runs:
     - name: Compare error counts
       id: compare
       shell: bash
-      run: |
-        if [ "${{ inputs.is-workspace }}" = "true" ]; then
-          # Handle workspace case
-          HEAD_ERRORS="${{ inputs.head-package-errors }}"
-          BASE_ERRORS="${{ inputs.base-package-errors }}"
-          FAIL_ON_INCREASE="${{ inputs.fail-on-increase }}"
-          
-          # Parse JSON objects into associative arrays
-          declare -A HEAD_COUNTS
-          declare -A BASE_COUNTS
-          declare -A DIFFERENCES
-          
-          # Extract package names and error counts from JSON
-          while IFS= read -r package; do
-            if [ -n "$package" ]; then
-              head_count=$(echo "$HEAD_ERRORS" | jq -r ".$package")
-              base_count=$(echo "$BASE_ERRORS" | jq -r ".$package")
-              HEAD_COUNTS["$package"]=$head_count
-              BASE_COUNTS["$package"]=$base_count
-              DIFFERENCES["$package"]=$((head_count - base_count))
-            fi
-          done < <(echo "$HEAD_ERRORS" | jq -r 'keys[]')
-          
-          # Calculate total difference
-          TOTAL_DIFF=0
-          for diff in "${DIFFERENCES[@]}"; do
-            TOTAL_DIFF=$((TOTAL_DIFF + diff))
-          done
-          
-          # Check if any package had an increase
-          ANY_INCREASE=false
-          for package in "${!DIFFERENCES[@]}"; do
-            if [ "${DIFFERENCES[$package]}" -gt 0 ]; then
-              ANY_INCREASE=true
-              echo "TypeScript errors increased in $package by ${DIFFERENCES[$package]}"
-              echo "HEAD Errors: ${HEAD_COUNTS[$package]}"
-              echo "BASE Errors: ${BASE_COUNTS[$package]}"
-            fi
-          done
-          
-          # Output results
-          echo "difference=$TOTAL_DIFF" >> $GITHUB_OUTPUT
-          echo "increased=$ANY_INCREASE" >> $GITHUB_OUTPUT
-          
-          # Convert differences to JSON
-          JSON="{"
-          for package in "${!DIFFERENCES[@]}"; do
-            if [ "$JSON" != "{" ]; then
-              JSON="$JSON,"
-            fi
-            JSON="$JSON\"$package\":${DIFFERENCES[$package]}"
-          done
-          JSON="$JSON}"
-          echo "package_differences=$JSON" >> $GITHUB_OUTPUT
-          
-          # Fail if any package had an increase and fail-on-increase is true
-          if [ "$ANY_INCREASE" = "true" ] && [ "$FAIL_ON_INCREASE" = "true" ]; then
-            echo "Error count increased in one or more packages. Failing..."
-            exit 1
-          fi
-        else
-          # Handle single package case
-          HEAD_ERRORS="${{ inputs.head-errors }}"
-          BASE_ERRORS="${{ inputs.base-errors }}"
-          FAIL_ON_INCREASE="${{ inputs.fail-on-increase }}"
-          
-          # Calculate difference
-          DIFFERENCE=$((HEAD_ERRORS - BASE_ERRORS))
-          echo "difference=$DIFFERENCE" >> $GITHUB_OUTPUT
-          
-          # Check if errors increased
-          if [ "$DIFFERENCE" -gt 0 ]; then
-            echo "increased=true" >> $GITHUB_OUTPUT
-            echo "TypeScript errors increased by $DIFFERENCE"
-            echo "HEAD Errors: $HEAD_ERRORS"
-            echo "BASE Errors: $BASE_ERRORS"
-            
-            if [ "$FAIL_ON_INCREASE" = "true" ]; then
-              echo "Error count increase ($DIFFERENCE). Failing..."
-              exit 1
-            fi
-          else
-            echo "increased=false" >> $GITHUB_OUTPUT
-            echo "TypeScript errors did not increase"
-            echo "HEAD Errors: $HEAD_ERRORS"
-            echo "BASE Errors: $BASE_ERRORS"
-            if [ "$DIFFERENCE" -lt 0 ]; then
-              echo "Reduced TypeScript errors by $((-DIFFERENCE))!"
-            else
-              echo "No change in error count"
-            fi
-          fi
-        fi 
+      env:
+        IS_WORKSPACE: ${{ inputs.is-workspace }}
+        FAIL_ON_INCREASE: ${{ inputs.fail-on-increase }}
+        HEAD_ERRORS: ${{ inputs.head-errors }}
+        BASE_ERRORS: ${{ inputs.base-errors }}
+        HEAD_PACKAGE_ERRORS: ${{ inputs.head-package-errors }}
+        BASE_PACKAGE_ERRORS: ${{ inputs.base-package-errors }}
+      run: bash "${{ github.action_path }}/../scripts/compare.sh"

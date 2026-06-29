@@ -52,6 +52,10 @@ inputs:
     required: false
   workspace-prebuild-command:
     description: Optional command to run before TypeScript compilation (runs at workspace root)
+  fail-on-increase:
+    description: Whether to fail the workflow when the error count increases
+    required: false
+    default: 'true'
 
 outputs:
   head-errors:
@@ -76,7 +80,7 @@ runs:
         ref: ${{ github.event.pull_request.base.sha }}
         
     - name: Install dependencies (BASE)
-      uses: thinkdx/ts-stricter/install@next
+      uses: thinkdx/ts-stricter/install@v2
       with:
         package-manager: ${{ inputs.package-manager }}
         working-directory: ${{ inputs.working-directory }}
@@ -87,7 +91,7 @@ runs:
 
     - name: Run TypeScript check (BASE)
       id: base-check
-      uses: thinkdx/ts-stricter/typescript@next
+      uses: thinkdx/ts-stricter/typescript@v2
       with:
         working-directory: ${{ inputs.working-directory }}
         tsconfig: ${{ inputs.tsconfig }}
@@ -111,7 +115,7 @@ runs:
         ref: ${{ github.event.pull_request.head.sha }}
         
     - name: Install dependencies (HEAD)
-      uses: thinkdx/ts-stricter/install@next
+      uses: thinkdx/ts-stricter/install@v2
       with:
         package-manager: ${{ inputs.package-manager }}
         working-directory: ${{ inputs.working-directory }}
@@ -122,7 +126,7 @@ runs:
 
     - name: Run TypeScript check (HEAD)
       id: head-check
-      uses: thinkdx/ts-stricter/typescript@next
+      uses: thinkdx/ts-stricter/typescript@v2
       with:
         working-directory: ${{ inputs.working-directory }}
         tsconfig: ${{ inputs.tsconfig }}
@@ -135,10 +139,11 @@ runs:
 
     - name: Compare error counts
       id: compare
-      uses: thinkdx/ts-stricter/compare@next
+      uses: thinkdx/ts-stricter/compare@v2
       with:
         head-errors: ${{ steps.head-check.outputs.error-count }}
         base-errors: ${{ steps.base-check.outputs.error-count }}
         head-package-errors: ${{ steps.head-check.outputs.package-errors }}
         base-package-errors: ${{ steps.base-check.outputs.package-errors }}
         is-workspace: ${{ inputs.is-workspace }}
+        fail-on-increase: ${{ inputs.fail-on-increase }}
