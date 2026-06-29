@@ -1,134 +1,195 @@
 # TS Stricter
 
-This GitHub Action helps you **iteratively migrate** your **unstrict** TypeScript codebase to a **strict** one. It does this by **comparing the TypeScript error count** on your pull request's **HEAD** branch vs. the **BASE** branch and **fails** the workflow if new errors have been introduced.  
+**Migrate an un-strict TypeScript codebase to `strict` mode, one pull request at a time — without ever blocking a build.**
 
-By ensuring that your error count never goes up, your team can gradually reduce existing errors over time—eventually reaching a fully strict codebase without sudden disruptions.
+`ts-stricter` is a GitHub Action that counts the TypeScript errors your code _would_ have under `strict` mode on your PR branch (**HEAD**) and on the target branch (**BASE**), and **fails the check only if the count went up**. Existing errors are grandfathered in; new ones are not. Your team chips away at the backlog on its own schedule, and the number only ever goes down.
 
-## Features
+---
 
-- 🔄 **Flexible Installation**: Support for npm, yarn, and pnpm with customizable install commands
-- 💾 **Dependency Caching**: Optional caching to speed up your workflows
-- 🛠 **Prebuild Support**: Run custom commands before TypeScript compilation
-- ⚙️ **TypeScript Configuration**: Use your own tsconfig.json with strict mode enforcement
-- 📊 **Error Tracking**: Detailed error count comparison with configurable failure thresholds
-- 🧩 **Modular Design**: Use the full workflow or individual composite actions for custom needs
+## The problem
 
-## Usage
+You want `strict: true`, but flipping it on lights up thousands of errors and breaks every build. So it stays off, and the codebase keeps accruing the exact problems strict mode would have caught. A big-bang migration never gets prioritized.
 
-### Basic Usage
+## The idea: a ratchet, not a cliff
 
-In your repository, create or update a GitHub Actions workflow file (e.g. `.github/workflows/compare-tsc-errors.yml`) with the following:
+Instead of demanding zero errors, `ts-stricter` enforces **"no more errors than before."** Each PR is allowed to leave the strict-error count flat or lower it — never raise it. The build is never blocked by the pre-existing backlog, but the backlog can only shrink.
+
+---
+
+## Recommended setup: strict **on** in the editor, **off** in the build
+
+> **Developers won't fix what they can't see.** If strict errors only surface in CI, people discover at PR time that they accidentally added some — which is annoying, so they skip or work around the check instead of fixing it. The fix is to make strict errors visible *while you code*, and keep them out of the build so nothing breaks.
+
+The pattern that makes this work is **two tsconfigs**:
+
+**`tsconfig.json`** — strict **on**. This is what your editor (VS Code, etc.) reads, so every developer sees strict errors as red squiggles in real time.
+
+```jsonc
+{
+  "compilerOptions": {
+    "strict": true
+    // ...the rest of your options
+  }
+}
+```
+
+**`tsconfig.build.json`** — strict **off**, for anything that must keep compiling today (bundlers, `tsc --build`, CI type-checks):
+
+```jsonc
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": false
+  }
+}
+```
+
+Point your build/type-check scripts at the relaxed config so they don't fail on the existing backlog:
+
+```jsonc
+// package.json
+{
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit"
+  }
+}
+```
+
+Then let **`ts-stricter` be the thing that enforces strictness** — it runs with `--strict` forced on (`strict-override: true`, the default) and only fails when the count increases. Developers see errors live, builds stay green, and the ratchet does the rest.
+
+---
+
+## Quick start
+
+Create `.github/workflows/ts-stricter.yml`:
 
 ```yaml
-name: Compare TSC Errors
+name: TS Stricter
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  compare-tsc-errors:
+  ts-stricter:
     runs-on: ubuntu-latest
     steps:
-      - name: Compare TSC on HEAD vs BASE
-        uses: thinkdx/ts-stricter@v2
+      - uses: thinkdx/ts-stricter@v2
 ```
 
-### Advanced Usage
+That's it. On every PR the action installs deps, runs `tsc --strict` on BASE and HEAD, and fails if HEAD has more errors.
+
+### A more configured example
 
 ```yaml
-name: Compare TSC Errors
-
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-jobs:
-  compare-tsc-errors:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Compare TSC on HEAD vs BASE
-        uses: thinkdx/ts-stricter@v2
-        with:
-          # Installation options
-          package-manager: 'yarn'           # npm, yarn, or pnpm (default: npm)
-          cache-dependencies: true                # Enable dependency caching (default: true)
-          install-command: 'yarn install'   # Custom install command (optional)
-          node-version: '18'               # Node.js version (default: 18)
-          
-          # TypeScript options
-          working-directory: './packages/core'  # Directory to run in (default: .)
-          tsconfig: 'tsconfig.strict.json'     # Custom tsconfig path (default: tsconfig.json)
-          strict-override: true                # Force strict mode (default: true)
-          
-          # Build options
-          prebuild-command: 'yarn build:deps'  # Command to run before TSC (optional)
-          prebuild-working-directory: '.'      # Prebuild working directory (default: .)
-```
-
-## Composite Actions
-
-This package includes several composite actions that can be used independently:
-
-### TypeScript Check (`./typescript`)
-
-Run TypeScript compiler and count errors:
-
-```yaml
-- uses: thinkdx/ts-stricter/typescript@v2
+- uses: thinkdx/ts-stricter@v2
   with:
-    working-directory: '.'
-    tsconfig: 'tsconfig.json'
-    strict-override: true
-    prebuild-command: ''
-    prebuild-working-directory: '.'
+    package-manager: pnpm          # npm | yarn | pnpm
+    node-version-file: .nvmrc      # or node-version: '20'
+    working-directory: ./app
+    tsconfig: tsconfig.json        # strict is forced regardless of what this says
+    prebuild-command: pnpm codegen # e.g. generate types before tsc
 ```
 
-### Dependency Installation (`./install`)
+---
 
-Install Node.js dependencies with caching:
+## How it works
+
+1. Check out **BASE**, install dependencies, run `tsc --strict --noEmit`, count errors.
+2. Check out **HEAD** (the merge commit by default), install, run the same, count errors.
+3. Compare. If HEAD > BASE, fail the check (unless `fail-on-increase: false`).
+
+The error count is parsed from `tsc`'s summary line (`Found N errors…`), so a clean run counts as `0`.
+
+---
+
+## Workspaces / monorepos
+
+For repos with several packages, each with its **own `tsconfig.json`**, run in workspace mode. Each package is counted independently and **any** package regressing fails the check.
 
 ```yaml
-- uses: thinkdx/ts-stricter/install@v2
+- uses: thinkdx/ts-stricter@v2
   with:
-    package-manager: 'npm'
-    working-directory: '.'
-    cache-dependencies: true
-    install-command: ''
-    node-version: '18'
+    is-workspace: true
+    workspace-packages: |
+      packages/app, packages/ui, packages/server
+    workspace-prebuild-command: pnpm -r build   # runs once at the repo root first
 ```
 
-### Error Comparison (`./compare`)
+Per-package error counts and differences are exposed as JSON outputs (`package-errors`, `package-differences`).
 
-Compare TypeScript error counts:
+---
 
-```yaml
-- uses: thinkdx/ts-stricter/compare@v2
-  with:
-    head-errors: '10'
-    base-errors: '12'
-```
+## Inputs
+
+| Input | Default | Description |
+| --- | --- | --- |
+| `working-directory` | `.` | Directory to run TypeScript in. |
+| `package-manager` | `npm` | `npm`, `yarn`, or `pnpm`. |
+| `cache-dependencies` | `true` | Cache the package manager's store between runs. |
+| `install-command` | _(auto)_ | Override the default install command. |
+| `node-version` | _(none)_ | Node.js version to set up. |
+| `node-version-file` | _(none)_ | Path to a version file (e.g. `.nvmrc`). |
+| `tsconfig` | `tsconfig.json` | tsconfig to use, relative to `working-directory` (or to each package in workspace mode). |
+| `strict-override` | `true` | Force `--strict` regardless of the tsconfig. |
+| `prebuild-command` | _(none)_ | Command to run before `tsc` (e.g. codegen). |
+| `prebuild-working-directory` | `.` | Working directory for `prebuild-command`. |
+| `use-head-commit` | `false` | Check out the PR head SHA instead of the merge commit. |
+| `is-workspace` | `false` | Enable multi-package workspace mode. |
+| `workspace-packages` | _(none)_ | Comma-separated package directories (workspace mode). |
+| `workspace-prebuild-command` | _(none)_ | Command run once at the workspace root before counting. |
+| `fail-on-increase` | `true` | Fail the workflow when the error count increases. Set `false` to report only. |
 
 ## Outputs
 
-The main action provides the following outputs:
+| Output | Description |
+| --- | --- |
+| `head-errors` | Total strict errors on HEAD. |
+| `base-errors` | Total strict errors on BASE. |
+| `error-difference` | `head - base`. |
+| `errors-increased` | `true` / `false`. |
 
-- `head-errors`: Number of TypeScript errors in HEAD
-- `base-errors`: Number of TypeScript errors in BASE
-- `error-difference`: Difference in error count (HEAD - BASE)
-- `errors-increased`: Whether the error count increased
+In workspace mode the `typescript` and `compare` sub-actions additionally expose `package-errors` and `package-differences` as JSON maps keyed by package directory.
+
+---
+
+## Composite sub-actions
+
+`ts-stricter` is built from three composable actions you can also use on their own:
+
+| Action | Purpose |
+| --- | --- |
+| `thinkdx/ts-stricter/install@v2` | Set up Node + the package manager and install deps (with caching). |
+| `thinkdx/ts-stricter/typescript@v2` | Run `tsc` and output the error count (single package or workspace). |
+| `thinkdx/ts-stricter/compare@v2` | Compare two counts (or two per-package maps) and fail on increase. |
+
+The heavy lifting lives in plain shell scripts under [`scripts/`](./scripts), which the actions invoke — so the logic is unit-testable without GitHub (see below).
+
+---
+
+## Local development & testing
+
+The error-counting and comparison logic is covered by a fast local harness — no GitHub, no PR required:
+
+```bash
+./test/run-tests.sh
+```
+
+It runs against fixture projects (a single package and a multi-`tsconfig` workspace) and asserts strict enforcement, workspace counting, and every comparison outcome. See [`test/README.md`](./test/README.md) for details and how to add fixtures. The same suite runs in CI on Node 18/20/22.
+
+---
 
 ## Notes
 
-1. **Pull Request Context**: This Action is specifically designed for **pull_request** events because it compares HEAD vs. BASE.
-2. **TypeScript Configuration**: The action will use your repository's `tsconfig.json` by default, with the `--strict` flag enforced unless disabled.
-3. **Caching**: Dependency caching is enabled by default to speed up workflows. Disable it with `cache-dependencies: false` if needed.
-4. **Custom Commands**: Use `install-command` and `prebuild-command` to customize the workflow for complex setups.
+- **Pull-request events only.** The action compares HEAD vs BASE, so it expects a `pull_request` trigger.
+- **Custom Node/setup steps** belong _before_ this action if you need them.
+- **`tsconfig` must exist** where the action runs; otherwise `tsc` falls back to its defaults.
 
 ## Contributing
 
-Contributions and feedback are welcome! If you have new ideas or run into issues, please open a GitHub issue or submit a pull request to this repository.
+Issues and PRs welcome. If you change the scripts, run `./test/run-tests.sh` and add a fixture/assertion for the behavior.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE). Feel free to modify and reuse in your own projects.
+[MIT](LICENSE).
