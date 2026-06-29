@@ -28,13 +28,19 @@ inputs:
 runs:
   using: "composite"
   steps:
+    # pnpm must be on PATH *before* setup-node, otherwise `cache: pnpm` fails
+    # because setup-node can't locate the pnpm store.
+    - name: Install pnpm
+      if: ${{ inputs.package-manager == 'pnpm' }}
+      uses: pnpm/action-setup@v4
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version-file }}
         cache: ${{ (inputs.cache-dependencies == 'true' && inputs.package-manager) || '' }}
-        
+
     - name: Get package manager data
       id: package-manager
       shell: bash
@@ -50,10 +56,6 @@ runs:
             echo "install_cmd=pnpm install --frozen-lockfile" >> $GITHUB_OUTPUT
             ;;
         esac
-
-    - name: Install pnpm
-      if: ${{ inputs.package-manager == 'pnpm' }}
-      uses: pnpm/action-setup@v4
 
     - name: Install dependencies
       shell: bash

@@ -8,7 +8,7 @@ inputs:
     required: false
     default: '.'
   tsconfig:
-    description: Path to custom tsconfig.json file (relative to working-directory)
+    description: Path to custom tsconfig.json file (relative to working-directory, or to each package in workspace mode)
     required: false
     default: 'tsconfig.json'
   strict-override:
@@ -22,15 +22,34 @@ inputs:
     description: Working directory for prebuild command
     required: false
     default: '.'
+  is-workspace:
+    description: Whether this is a workspace with multiple packages
+    required: false
+    default: 'false'
+  workspace-packages:
+    description: Comma-separated list of workspace package directories
+    required: false
+  workspace-prebuild-command:
+    description: Optional command to run before TypeScript compilation at workspace root
+    required: false
 
 outputs:
   error-count:
-    description: The number of TypeScript errors found
+    description: The number of TypeScript errors found (total across packages in workspace mode)
     value: ${{ steps.count-errors.outputs.error_count }}
+  package-errors:
+    description: JSON object containing error counts per package (for workspaces)
+    value: ${{ steps.count-errors.outputs.package_errors }}
 
 runs:
   using: "composite"
   steps:
+    - name: Run workspace prebuild command
+      if: inputs.is-workspace == 'true' && inputs.workspace-prebuild-command != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: ${{ inputs.workspace-prebuild-command }}
+
     - name: Run prebuild command
       if: inputs.prebuild-command != ''
       shell: bash
@@ -41,37 +60,9 @@ runs:
       id: count-errors
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: |
-        # Function to run TSC and get error count
-        run_tsc_and_get_errors() {
-          local OUTPUT
-          local COUNT
-          local CONFIG_PATH="${{ inputs.tsconfig }}"
-          local STRICT_OVERRIDE="${{ inputs.strict-override }}"
-          
-          # Prepare TSC command
-          local TSC_CMD="npx tsc --pretty --noEmit"
-          
-          # Add strict override if enabled
-          if [ "$STRICT_OVERRIDE" = "true" ]; then
-            TSC_CMD="$TSC_CMD --strict"
-          fi
-          
-          # Add config path if specified
-          if [ -f "$CONFIG_PATH" ]; then
-            TSC_CMD="$TSC_CMD --project $CONFIG_PATH"
-          fi
-
-          # Run TSC and capture output
-          OUTPUT=$($TSC_CMD 2>&1 || true)
-          
-          # Parse error count using improved regex
-          COUNT=$(echo "$OUTPUT" | grep -Eo "Found ([0-9]+) error(s?)" | grep -Eo "[0-9]+" | head -n1 || echo "0")
-          
-          echo "$COUNT"
-        }
-
-        # Run TSC and get error count
-        ERROR_COUNT=$(run_tsc_and_get_errors)
-        echo "TypeScript errors found: $ERROR_COUNT"
-        echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT 
+      env:
+        TSCONFIG: ${{ inputs.tsconfig }}
+        STRICT_OVERRIDE: ${{ inputs.strict-override }}
+        IS_WORKSPACE: ${{ inputs.is-workspace }}
+        WORKSPACE_PACKAGES: ${{ inputs.workspace-packages }}
+      run: bash "${{ github.action_path }}/../scripts/run-check.sh"
