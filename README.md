@@ -86,6 +86,7 @@ That's it. On every PR the action installs deps, runs `tsc --strict` on BASE and
 - uses: thinkdx/ts-stricter@v2
   with:
     package-manager: pnpm          # npm | yarn | pnpm
+    pnpm-version: '9'              # pnpm only; or set "packageManager" in package.json
     node-version-file: .nvmrc      # or node-version: '20'
     working-directory: ./app
     tsconfig: tsconfig.json        # strict is forced regardless of what this says
