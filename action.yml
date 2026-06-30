@@ -11,6 +11,11 @@ inputs:
     description: Package manager to use (npm, yarn, or pnpm)
     required: false
     default: 'npm'
+  pnpm-version:
+    description: |
+      pnpm version to install (only used when package-manager is pnpm).
+      Leave blank to read it from the package.json "packageManager" field.
+    required: false
   cache-dependencies:
     description: Whether to enable dependency caching
     required: false
@@ -83,6 +88,7 @@ runs:
       uses: thinkdx/ts-stricter/install@v2
       with:
         package-manager: ${{ inputs.package-manager }}
+        pnpm-version: ${{ inputs.pnpm-version }}
         working-directory: ${{ inputs.working-directory }}
         cache-dependencies: ${{ inputs.cache-dependencies }}
         install-command: ${{ inputs.install-command }}
@@ -118,6 +124,7 @@ runs:
       uses: thinkdx/ts-stricter/install@v2
       with:
         package-manager: ${{ inputs.package-manager }}
+        pnpm-version: ${{ inputs.pnpm-version }}
         working-directory: ${{ inputs.working-directory }}
         cache-dependencies: ${{ inputs.cache-dependencies }}
         install-command: ${{ inputs.install-command }}
