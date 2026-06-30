@@ -1,5 +1,5 @@
 name: TS Stricter
-description: Compare the TypeScript error counts on the HEAD branch vs. the base branch.
+description: Ratchet an un-strict TypeScript codebase toward strict mode by failing any PR that increases the tsc error count.
 author: ThinkDX
 
 branding:
