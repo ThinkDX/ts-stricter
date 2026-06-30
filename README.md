@@ -188,6 +188,13 @@ It runs against fixture projects (a single package and a multi-`tsconfig` worksp
 - **`tsconfig` must exist** where the action runs; otherwise `tsc` falls back to its defaults.
 - **pnpm needs a version.** With `package-manager: pnpm`, either set `pnpm-version` or add a [`packageManager`](https://nodejs.org/api/packages.html#packagemanager) field to your `package.json` (e.g. `"packageManager": "pnpm@9.15.4"`). Without one, `pnpm/action-setup` errors with _"No pnpm version is specified."_
 
+## Versioning
+
+- **`@v2`** — the moving major. Recommended for most users; you get fixes and backward-compatible improvements automatically.
+- **`@v2.0.0`** — an immutable release tag (its internal sub-actions are pinned to the same tag). Use this if you want fully reproducible builds.
+
+`v2` is maintained as a branch for development; releases are cut as `vX.Y.Z` tags.
+
 ## Contributing
 
 Issues and PRs welcome. If you change the scripts, run `./test/run-tests.sh` and add a fixture/assertion for the behavior.
