@@ -1,4 +1,4 @@
-name: Compare TSC Error Counts
+name: TS Stricter
 description: Compare the TypeScript error counts on the HEAD branch vs. the base branch.
 author: ThinkDX
 
