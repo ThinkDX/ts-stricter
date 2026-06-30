@@ -127,6 +127,7 @@ Per-package error counts and differences are exposed as JSON outputs (`package-e
 | --- | --- | --- |
 | `working-directory` | `.` | Directory to run TypeScript in. |
 | `package-manager` | `npm` | `npm`, `yarn`, or `pnpm`. |
+| `pnpm-version` | _(none)_ | pnpm version to install (pnpm only). Blank reads it from `packageManager` in `package.json`. See the pnpm note below. |
 | `cache-dependencies` | `true` | Cache the package manager's store between runs. |
 | `install-command` | _(auto)_ | Override the default install command. |
 | `node-version` | _(none)_ | Node.js version to set up. |
@@ -185,6 +186,7 @@ It runs against fixture projects (a single package and a multi-`tsconfig` worksp
 - **Pull-request events only.** The action compares HEAD vs BASE, so it expects a `pull_request` trigger.
 - **Custom Node/setup steps** belong _before_ this action if you need them.
 - **`tsconfig` must exist** where the action runs; otherwise `tsc` falls back to its defaults.
+- **pnpm needs a version.** With `package-manager: pnpm`, either set `pnpm-version` or add a [`packageManager`](https://nodejs.org/api/packages.html#packagemanager) field to your `package.json` (e.g. `"packageManager": "pnpm@9.15.4"`). Without one, `pnpm/action-setup` errors with _"No pnpm version is specified."_
 
 ## Contributing
 

@@ -7,6 +7,12 @@ inputs:
     description: Package manager to use (npm, yarn, or pnpm)
     required: false
     default: 'npm'
+  pnpm-version:
+    description: |
+      pnpm version to install (only used when package-manager is pnpm).
+      Leave blank to let pnpm/action-setup read the version from your
+      package.json "packageManager" field. One of the two is required for pnpm.
+    required: false
   working-directory:
     description: Directory containing package.json
     required: false
@@ -33,6 +39,9 @@ runs:
     - name: Install pnpm
       if: ${{ inputs.package-manager == 'pnpm' }}
       uses: pnpm/action-setup@v4
+      with:
+        # Empty falls back to the package.json "packageManager" field.
+        version: ${{ inputs.pnpm-version }}
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
