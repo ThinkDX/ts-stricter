@@ -2,6 +2,10 @@ name: Compare TSC Error Counts
 description: Compare the TypeScript error counts on the HEAD branch vs. the base branch.
 author: ThinkDX
 
+branding:
+  icon: shield
+  color: blue
+
 inputs:
   working-directory:
     description: Directory to run TypeScript in
